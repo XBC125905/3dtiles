@@ -17,9 +17,6 @@ use chrono::prelude::*;
 use log::{Level, LevelFilter};
 
 fn main() {
-//     use std::io;
-//     let mut msg = String::new();
-//     io::stdin().read_line(&mut msg).unwrap();
     use std::env;
     if let Err(_) = env::var("RUST_LOG") {
         env::set_var("RUST_LOG", "info");
@@ -27,22 +24,25 @@ fn main() {
     env::set_var("RUST_BACKTRACE", "1");
 
     let mut builder = env_logger::Builder::from_default_env();
-    builder.format(|buf, record| {
-        let dt = Local::now();
-        let mut style = buf.style();
-        if record.level() <= Level::Error {
-            style.set_color(env_logger::Color::Red);
-        }
-        else {
-            style.set_color(env_logger::Color::Green);
-        }
-        writeln!(buf, "{}: {} - {}", 
-            style.value(record.level()),
-            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
-            record.args())
+    builder
+        .format(|buf, record| {
+            let dt = Local::now();
+            let mut style = buf.style();
+            if record.level() <= Level::Error {
+                style.set_color(env_logger::Color::Red);
+            } else {
+                style.set_color(env_logger::Color::Green);
+            }
+            writeln!(
+                buf,
+                "{}: {} - {}",
+                style.value(record.level()),
+                dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+                record.args()
+            )
         })
-       .filter(None, LevelFilter::Info)
-       .init();
+        .filter(None, LevelFilter::Info)
+        .init();
     //env_logger::init();
     let matches = App::new("Make 3dtile program")
         .version("1.0")
@@ -91,6 +91,12 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("height")
+                .long("height field")
+                .help("set the shapefile height field")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("verbose")
                 .short("v")
                 .long("verbose")
@@ -103,6 +109,7 @@ fn main() {
     let output = matches.value_of("output").unwrap();
     let format = matches.value_of("format").unwrap();
     let tile_config = matches.value_of("config").unwrap_or("");
+    let height_field = matches.value_of("height").unwrap_or("");
 
     if matches.is_present("verbose") {
         info!("set program versose on");
@@ -115,6 +122,9 @@ fn main() {
     match format {
         "osgb" => {
             convert_osgb(input, output, tile_config);
+        }
+        "shape" => {
+            convert_shapefile(input, output, height_field);
         }
         _ => {
             error!("not support now.");
@@ -197,4 +207,18 @@ fn convert_osgb(src: &str, dest: &str, config: &str) {
     let elap_sec = tick.elapsed().unwrap();
     let tick_num = elap_sec.as_secs() as f64 + elap_sec.subsec_nanos() as f64 * 1e-9;
     info!("task over, cost {:.2} s.", tick_num);
+}
+
+fn convert_shapefile(src: &str, dest: &str, height: &str) {
+    let tick = std::time::SystemTime::now();
+
+    let ret = shape::shape_batch_convert(src, dest, height);
+	if !ret {
+		error!("convert shapefile failed");
+	}
+	else {
+		let elap_sec = tick.elapsed().unwrap();
+		let tick_num = elap_sec.as_secs() as f64 + elap_sec.subsec_nanos() as f64 * 1e-9;
+		info!("task over, cost {:.2} s.", tick_num);   
+	}
 }
