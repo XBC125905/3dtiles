@@ -28,25 +28,44 @@ extern "C" bool epsg_convert(int insrs, double* val, char* path) {
     return false;
 } 
 
-double degree2rad(double val) {
-    return val * pi / 180.0;
+extern "C" bool wkt_convert(char* wkt, double* val, char* path) {
+    CPLSetConfigOption("GDAL_DATA", path);
+    OGRSpatialReference inRs,outRs;
+    inRs.importFromWkt(&wkt);
+    outRs.importFromEPSG(4326);
+    OGRCoordinateTransformation *poCT = OGRCreateCoordinateTransformation( &inRs, &outRs );
+    if (poCT) {
+        if (poCT->Transform( 1, val, val + 1)) {
+            delete poCT;
+            return true;
+        }
+        delete poCT;
+    }
+    return false;
 }
 
-double lati_to_meter(double diff) {
-    return diff / 0.000000157891;
+extern "C"
+{
+	double degree2rad(double val) {
+		return val * pi / 180.0;
+	}
+	double lati_to_meter(double diff) {
+		return diff / 0.000000157891;
+	}
+
+	double longti_to_meter(double diff, double lati) {
+		return diff / 0.000000156785 * std::cos(lati);
+	}
+
+	double meter_to_lati(double m) {
+		return m * 0.000000157891;
+	}
+
+	double meter_to_longti(double m, double lati) {
+		return m * 0.000000156785 / std::cos(lati);
+	}
 }
 
-double longti_to_meter(double diff, double lati) {
-    return diff / 0.000000156785 * std::cos(lati);
-}
-
-double meter_to_lati (double m) {
-    return m * 0.000000157891;
-}
-
-double meter_to_longti(double m, double lati) {
-    return m * 0.000000156785 / std::cos(lati);
-}
 
 std::vector<double> transfrom_xyz(double radian_x, double radian_y, double height_min){
     double ellipsod_a = 40680631590769;
@@ -153,7 +172,7 @@ bool write_tileset_box(
         sprintf(last_buf,"]},\"geometricError\": %f,\
             \"refine\": \"REPLACE\",\
             \"content\": {\
-                \"url\": \"%s\"}}}", geometricError, b3dm_file);
+                \"uri\": \"%s\"}}}", geometricError, b3dm_file);
 
         json_txt += last_buf;
 
@@ -203,7 +222,7 @@ bool write_tileset_box(
             sprintf(last_buf,"]},\"geometricError\": %f,\
                 \"refine\": \"REPLACE\",\
                 \"content\": {\
-                    \"url\": \"%s\"}}}", geometricError, b3dm_file);
+                    \"uri\": \"%s\"}}}", geometricError, b3dm_file);
 
             json_txt += last_buf;
 
@@ -315,7 +334,7 @@ bool write_tileset_box(
                     sprintf(last_buf,"]},\"geometricError\": %f,\
                         \"refine\": \"REPLACE\",\
                         \"content\": {\
-                            \"url\": \"%s\"}}}", geometricError, filename);
+                            \"uri\": \"%s\"}}}", geometricError, filename);
 
                     json_txt += last_buf;
 
